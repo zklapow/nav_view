@@ -8,4 +8,5 @@
 
   <url>http://ros.org/wiki/nav_view</url>
   <build_depends>catkin</build_depends>
+  <depends>python-imaging</depends>
 </stack>

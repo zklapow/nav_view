@@ -4,9 +4,9 @@ import rospy
 from nav_view import NavView
 from qt_gui.plugin import Plugin
 
-class RobotMonitorPlugin(Plugin):
+class NavViewPlugin(Plugin):
     def __init__(self, context):
-        super(RobotMonitorPlugin, self).__init__(context)
+        super(NavViewPlugin, self).__init__(context)
         context.add_widget(NavView())
 
         self.setObjectName('Naviation View')

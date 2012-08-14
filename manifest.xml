@@ -12,6 +12,8 @@
   <depend package="rqt_gui"/>
   <depend package="rqt_gui_py"/>
 
+  <depend package="nav_msgs" />
+
   <export>
     <rqt_gui plugin="${prefix}/plugin.xml" />
   </export>
