@@ -1,12 +1,14 @@
 import roslib;roslib.load_manifest('nav_view')
 import rospy
+import tf
 
 import random
 
 from nav_msgs.msg import OccupancyGrid, Path
+from geometry_msgs.msg import PolygonStamped, PointStamped
 
-from QtCore import pyqtSignal
-from QtGui import QWidget, QPixmap, QVBoxLayout, QLabel, QImage, QGraphicsView, QGraphicsScene, QPainterPath, QPen, QColor
+from QtCore import pyqtSignal, QPointF
+from QtGui import QWidget, QPixmap, QImage, QGraphicsView, QGraphicsScene, QPainterPath, QPen, QColor, QPolygonF
 
 from PIL import Image
 from PIL.ImageQt import ImageQt
@@ -24,24 +26,35 @@ class PathInfo(object):
 class NavView(QGraphicsView):
     sig_map = pyqtSignal()
     path_changed = pyqtSignal(str)
-    def __init__(self, map_topic = '/map', paths = ['/move_base/TrajectoryPlannerROS/global_plan', '/move_base/SBPLLatticePlanner/plan'], polygons= []):
+    polygon_changed = pyqtSignal(str)
+    def __init__(self, map_topic = '/map', 
+                 paths = ['/move_base/SBPLLatticePlanner/plan', '/move_base/TrajectoryPlannerROS/local_plan'], 
+                 polygons= ['/move_base/local_costmap/robot_footprint']):
         super(QWidget, self).__init__()
+
         self.sig_map.connect(self._update)
         self.destroyed.connect(self.close)
+
         self._map = None
         self._map_item = None
 
         self._paths = {}
+        self._polygons = {}
         self.path_changed.connect(self._update_path)
+        self.polygon_changed.connect(self._update_polygon)
 
         self._colors = [(238, 34, 116), (68, 134, 252), (236, 228, 46), (102, 224, 18), (242, 156, 6), (240, 64, 10), (196, 30, 250)]
 
         self._scene = QGraphicsScene()
 
+        self._tf = tf.TransformListener()
         self.map_sub = rospy.Subscriber('/map', OccupancyGrid, self.map_cb) 
 
         for path in paths:
             self.add_path(path)
+
+        for poly in polygons:
+            self.add_polygon(poly)
 
         self.setScene(self._scene)
 
@@ -71,14 +84,28 @@ class NavView(QGraphicsView):
         path = PathInfo(name)
         def c(msg):
             pp = QPainterPath()
-            start = msg.poses[0].pose.position
-            pp.moveTo(start.x / self.resolution, start.y / self.resolution)
-            for pose in msg.poses:
-                pt = pose.pose.position
-                pp.lineTo(pt.x / self.resolution, pt.y / self.resolution)
 
-            path.path = pp
-            self.path_changed.emit(name)
+            # Transform everything in to the map frame
+            if not (msg.header.frame_id == '/map' or msg.header.frame_id == ''):
+                try:
+                    self._tf.waitForTransform(msg.header.frame_id, '/map', rospy.Time(), rospy.Duration(10))
+                    data = [self._tf.transformPose('/map', pose) for pose in msg.poses]
+                except tf.Exception as e:
+                    rospy.logerr("TF Error")
+                    data = []
+            else:
+                data = msg.poses
+
+            if len(data) > 0:
+                start = data[0].pose.position
+                pp.moveTo(start.x / self.resolution, start.y / self.resolution)
+
+                for pose in data:
+                    pt = pose.pose.position
+                    pp.lineTo(pt.x / self.resolution, pt.y / self.resolution)
+
+                path.path = pp
+                self.path_changed.emit(name)
 
         path.color = random.choice(self._colors)
         self._colors.remove(path.color)
@@ -87,6 +114,45 @@ class NavView(QGraphicsView):
         path.sub = rospy.Subscriber(path.name, Path, path.cb)
 
         self._paths[name] = path
+
+    def add_polygon(self, name):
+        poly = PathInfo(name)
+        def c(msg):
+            if not (msg.header.frame_id == '/map' or msg.header.frame_id == ''):
+                try:
+                    self._tf.waitForTransform(msg.header.frame_id, '/map', rospy.Time(), rospy.Duration(10))
+                    points_stamped = []
+                    for pt in msg.polygon.points:
+                        ps = PointStamped()
+                        ps.header.frame_id = msg.header.frame_id
+                        ps.point.x = pt.x
+                        ps.point.y = pt.y
+
+                        points_stamped.append(ps)
+
+                    trans_pts = [self._tf.transformPoint('/map', pt).point for pt in points_stamped]
+                except tf.Exception:
+                    rospy.logerr("TF Error")
+                    trans_pts = []
+            else:
+                trans_pts = [pt for pt in msg.polygon.points]
+
+            if len(trans_pts) > 0:
+                pts = [QPointF(pt.x / self.resolution, pt.y / self.resolution) for pt in trans_pts]
+
+                close = trans_pts[0]
+                pts.append(QPointF(close.x / self.resolution, close.y / self.resolution))
+                poly.path = QPolygonF(pts)
+
+                self.polygon_changed.emit(name)
+
+        poly.color = random.choice(self._colors)
+        self._colors.remove(poly.color)
+
+        poly.cb = c
+        poly.sub = rospy.Subscriber(poly.name, PolygonStamped, poly.cb)
+
+        self._polygons[name] = poly
 
     def close(self):
         if self.map_sub:
@@ -116,6 +182,18 @@ class NavView(QGraphicsView):
 
         # Everything must be mirrored
         self._mirror(self._paths[name].item)
+
+    def _update_polygon(self, name):
+        try:
+            self._scene.removeItem(self._polygons[name].item)
+        except:
+            pass
+
+        self._polygons[name].item = self._scene.addPolygon(self._polygons[name].path, pen = QPen(QColor(*self._polygons[name].color)))
+
+
+        # Everything must be mirrored
+        self._mirror(self._polygons[name].item)
 
     def _mirror(self, item):
         item.scale(-1,1)
