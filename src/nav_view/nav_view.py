@@ -16,7 +16,7 @@ def mirror(item):
 class NavView(QGraphicsView):
     sig_map = pyqtSignal()
     path_changed = pyqtSignal(str)
-    def __init__(self):
+    def __init__(self, map_topic = '/map', paths = ['/move_base/SBPLLatticePlanner/plan', '/move_base/TrajectoryPlannerROS/global_plan']):
         super(QWidget, self).__init__()
         self.sig_map.connect(self._update)
         self.destroyed.connect(self.close)
@@ -33,7 +33,8 @@ class NavView(QGraphicsView):
 
         self.map_sub = rospy.Subscriber('/map', OccupancyGrid, self.map_cb) 
 
-        self.add_path('/move_base/SBPLLatticePlanner/plan')
+        for path in paths:
+            self.add_path(path)
 
         self.setScene(self._scene)
 
