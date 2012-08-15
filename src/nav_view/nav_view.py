@@ -11,21 +11,27 @@ from QtGui import QWidget, QPixmap, QVBoxLayout, QLabel, QImage, QGraphicsView, 
 from PIL import Image
 from PIL.ImageQt import ImageQt
 
+class PathInfo(object):
+    def __init__(self, name=None):
+        self.color = None
+        self.sub = None
+        self.cb = None
+        self.path = None
+        self.item = None
+
+        self.name = name
+
 class NavView(QGraphicsView):
     sig_map = pyqtSignal()
     path_changed = pyqtSignal(str)
-    def __init__(self, map_topic = '/map', paths = ['/move_base/TrajectoryPlannerROS/global_plan', '/move_base/SBPLLatticePlanner/plan']):
+    def __init__(self, map_topic = '/map', paths = ['/move_base/TrajectoryPlannerROS/global_plan', '/move_base/SBPLLatticePlanner/plan'], polygons= []):
         super(QWidget, self).__init__()
         self.sig_map.connect(self._update)
         self.destroyed.connect(self.close)
         self._map = None
         self._map_item = None
 
-        self._path_cbs = {}
-        self._path_subs = {}
-        self._path_items = {}
         self._paths = {}
-        self._path_colors = {}
         self.path_changed.connect(self._update_path)
 
         self._colors = [(238, 34, 116), (68, 134, 252), (236, 228, 46), (102, 224, 18), (242, 156, 6), (240, 64, 10), (196, 30, 250)]
@@ -62,23 +68,25 @@ class NavView(QGraphicsView):
         self.sig_map.emit()
 
     def add_path(self, name):
+        path = PathInfo(name)
         def c(msg):
-            path = QPainterPath()
+            pp = QPainterPath()
             start = msg.poses[0].pose.position
-            path.moveTo(start.x / self.resolution, start.y / self.resolution)
+            pp.moveTo(start.x / self.resolution, start.y / self.resolution)
             for pose in msg.poses:
                 pt = pose.pose.position
-                path.lineTo(pt.x / self.resolution, pt.y / self.resolution)
+                pp.lineTo(pt.x / self.resolution, pt.y / self.resolution)
 
-            self._paths[name] = path
+            path.path = pp
             self.path_changed.emit(name)
 
-        color = random.choice(self._colors)
-        self._colors.remove(color)
-        self._path_colors[name] = color
+        path.color = random.choice(self._colors)
+        self._colors.remove(path.color)
 
-        self._path_cbs[name] = c
-        self._path_subs = rospy.Subscriber(name, Path, self._path_cbs[name])
+        path.cb = c
+        path.sub = rospy.Subscriber(path.name, Path, path.cb)
+
+        self._paths[name] = path
 
     def close(self):
         if self.map_sub:
@@ -99,13 +107,15 @@ class NavView(QGraphicsView):
         self.show()
 
     def _update_path(self, name):
-        if name in self._path_items.keys():
-            self._scene.removeItem(self._path_items[name])
+        try:
+            self._scene.removeItem(self._paths[name].item)
+        except:
+            pass
 
-        self._path_items[name] = self._scene.addPath(self._paths[name], pen = QPen(QColor(*self._path_colors[name])))
+        self._paths[name].item = self._scene.addPath(self._paths[name].path, pen = QPen(QColor(*self._paths[name].color)))
 
         # Everything must be mirrored
-        self._mirror(self._path_items[name])
+        self._mirror(self._paths[name].item)
 
     def _mirror(self, item):
         item.scale(-1,1)
