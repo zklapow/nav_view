@@ -1,10 +1,12 @@
 import roslib;roslib.load_manifest('nav_view')
 import rospy
 
+import random
+
 from nav_msgs.msg import OccupancyGrid, Path
 
 from QtCore import pyqtSignal
-from QtGui import QWidget, QPixmap, QVBoxLayout, QLabel, QImage, QGraphicsView, QGraphicsScene, QPainterPath
+from QtGui import QWidget, QPixmap, QVBoxLayout, QLabel, QImage, QGraphicsView, QGraphicsScene, QPainterPath, QPen, QColor
 
 from PIL import Image
 from PIL.ImageQt import ImageQt
@@ -12,7 +14,7 @@ from PIL.ImageQt import ImageQt
 class NavView(QGraphicsView):
     sig_map = pyqtSignal()
     path_changed = pyqtSignal(str)
-    def __init__(self, map_topic = '/map', paths = ['/move_base/SBPLLatticePlanner/plan', '/move_base/TrajectoryPlannerROS/global_plan']):
+    def __init__(self, map_topic = '/map', paths = ['/move_base/TrajectoryPlannerROS/global_plan', '/move_base/SBPLLatticePlanner/plan']):
         super(QWidget, self).__init__()
         self.sig_map.connect(self._update)
         self.destroyed.connect(self.close)
@@ -23,7 +25,10 @@ class NavView(QGraphicsView):
         self._path_subs = {}
         self._path_items = {}
         self._paths = {}
+        self._path_colors = {}
         self.path_changed.connect(self._update_path)
+
+        self._colors = [(238, 34, 116), (68, 134, 252), (236, 228, 46), (102, 224, 18), (242, 156, 6), (240, 64, 10), (196, 30, 250)]
 
         self._scene = QGraphicsScene()
 
@@ -68,6 +73,10 @@ class NavView(QGraphicsView):
             self._paths[name] = path
             self.path_changed.emit(name)
 
+        color = random.choice(self._colors)
+        self._colors.remove(color)
+        self._path_colors[name] = color
+
         self._path_cbs[name] = c
         self._path_subs = rospy.Subscriber(name, Path, self._path_cbs[name])
 
@@ -93,7 +102,7 @@ class NavView(QGraphicsView):
         if name in self._path_items.keys():
             self._scene.removeItem(self._path_items[name])
 
-        self._path_items[name] = self._scene.addPath(self._paths[name])
+        self._path_items[name] = self._scene.addPath(self._paths[name], pen = QPen(QColor(*self._path_colors[name])))
 
         # Everything must be mirrored
         self._mirror(self._path_items[name])
