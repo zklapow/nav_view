@@ -9,10 +9,6 @@ from QtGui import QWidget, QPixmap, QVBoxLayout, QLabel, QImage, QGraphicsView, 
 from PIL import Image
 from PIL.ImageQt import ImageQt
 
-def mirror(item):
-    item.scale(-1,1)
-    item.translate(-item.boundingRect().width(), 0)
-
 class NavView(QGraphicsView):
     sig_map = pyqtSignal()
     path_changed = pyqtSignal(str)
@@ -56,8 +52,6 @@ class NavView(QGraphicsView):
 
         im = Image.new('RGB', (self.w, self.h))
         im.putdata(data)
-    
-        #Occupancy grid is mirrored
         self._map = im
 
         self.sig_map.emit()
@@ -90,7 +84,7 @@ class NavView(QGraphicsView):
         self._map_item = self._scene.addPixmap(QPixmap.fromImage(self.pix))
 
         # Everything must be mirrored
-        mirror(self._map_item)
+        self._mirror(self._map_item)
 
         self.centerOn(self._map_item)
         self.show()
@@ -100,6 +94,11 @@ class NavView(QGraphicsView):
             self._scene.removeItem(self._path_items[name])
 
         self._path_items[name] = self._scene.addPath(self._paths[name])
-        self._path_items[name].scale(-1, 1)
-        self._path_items[name].translate(-self._map_item.boundingRect().width(), 0)
+
+        # Everything must be mirrored
+        self._mirror(self._path_items[name])
+
+    def _mirror(self, item):
+        item.scale(-1,1)
+        item.translate(-self.w, 0)
 
