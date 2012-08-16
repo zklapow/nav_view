@@ -8,7 +8,7 @@ from nav_msgs.msg import OccupancyGrid, Path
 from geometry_msgs.msg import PolygonStamped, PointStamped
 
 from QtCore import pyqtSignal, QPointF
-from QtGui import QWidget, QPixmap, QImage, QGraphicsView, QGraphicsScene, QPainterPath, QPen, QColor, QPolygonF
+from QtGui import QWidget, QPixmap, QImage, QGraphicsView, QGraphicsScene, QPainterPath, QPen, QColor, QPolygonF, QPushButton, QVBoxLayout, QHBoxLayout
 
 from PIL import Image
 from PIL.ImageQt import ImageQt
@@ -22,6 +22,36 @@ class PathInfo(object):
         self.item = None
 
         self.name = name
+
+class NavViewWidget(QWidget):
+    def __init__(self, map_topic = '/map', 
+                 paths = ['/move_base/SBPLLatticePlanner/plan', '/move_base/TrajectoryPlannerROS/local_plan'], 
+                 polygons= ['/move_base/local_costmap/robot_footprint']):
+        super(NavViewWidget, self).__init__()
+        self._layout = QVBoxLayout()
+
+        self._nav_view = NavView(map_topic, paths, polygons)
+        self._layout.addWidget(self._nav_view)
+
+        self._button_layout = QHBoxLayout()
+
+        self._zoom_out_button = QPushButton('Zoom Out')
+        self._zoom_out_button.clicked.connect(self._zoom_out)
+        self._button_layout.addWidget(self._zoom_out_button)
+
+        self._zoom_in_button = QPushButton('Zoom In')
+        self._zoom_in_button.clicked.connect(self._zoom_in)
+        self._button_layout.addWidget(self._zoom_in_button)
+
+        self._layout.addLayout(self._button_layout)
+
+        self.setLayout(self._layout)
+
+    def _zoom_in(self): 
+        self._nav_view.zoom_in(2)
+
+    def _zoom_out(self):
+        self._nav_view.zoom_out(2)
 
 class NavView(QGraphicsView):
     sig_map = pyqtSignal()
@@ -37,6 +67,9 @@ class NavView(QGraphicsView):
 
         self._map = None
         self._map_item = None
+
+        self.w = 0
+        self.h = 0
 
         self._paths = {}
         self._polygons = {}
@@ -78,6 +111,20 @@ class NavView(QGraphicsView):
         im.putdata(data)
         self._map = im
 
+        self.sig_map.emit()
+
+    def zoom_in(self, amount):
+        self.w = self.w * amount
+        self.h = self.h * amount
+        self._map = self._map.resize((self.w, self.h))
+        self.resolution = self.resolution / amount
+        self.sig_map.emit()
+
+    def zoom_out(self, amount):
+        self.w = self.w / amount
+        self.h = self.h / amount
+        self._map = self._map.resize((self.w, self.h))
+        self.resolution = self.resolution * amount
         self.sig_map.emit()
 
     def add_path(self, name):
@@ -158,6 +205,14 @@ class NavView(QGraphicsView):
         if self.map_sub:
             self.map_sub.unregister()
 
+        for p in self._paths:
+            if p.sub:
+                p.sub.unregister()
+
+        for p in self._polygons:
+            if p.sub:
+                p.sub.unregister()
+
     def _update(self):
         if self._map_item:
             self._scene.removeItem(self._map_item)
@@ -173,27 +228,30 @@ class NavView(QGraphicsView):
         self.show()
 
     def _update_path(self, name):
-        try:
-            self._scene.removeItem(self._paths[name].item)
-        except:
-            pass
+        old_item = None
+        if name in self._paths.keys():
+            old_item = self._paths[name].item
 
         self._paths[name].item = self._scene.addPath(self._paths[name].path, pen = QPen(QColor(*self._paths[name].color)))
 
         # Everything must be mirrored
         self._mirror(self._paths[name].item)
 
+        if old_item:
+            self._scene.removeItem(old_item)
+
     def _update_polygon(self, name):
-        try:
-            self._scene.removeItem(self._polygons[name].item)
-        except:
-            pass
+        old_item = None
+        if name in self._polygons.keys():
+            old_item = self._polygons[name].item
 
         self._polygons[name].item = self._scene.addPolygon(self._polygons[name].path, pen = QPen(QColor(*self._polygons[name].color)))
 
-
         # Everything must be mirrored
         self._mirror(self._polygons[name].item)
+
+        if old_item:
+            self._scene.removeItem(old_item)
 
     def _mirror(self, item):
         item.scale(-1,1)
