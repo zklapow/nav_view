@@ -54,7 +54,7 @@ class NavViewWidget(QWidget):
         self._nav_view.zoom_out(2)
 
 class NavView(QGraphicsView):
-    sig_map = pyqtSignal()
+    map_changed = pyqtSignal()
     path_changed = pyqtSignal(str)
     polygon_changed = pyqtSignal(str)
     def __init__(self, map_topic = '/map', 
@@ -62,7 +62,7 @@ class NavView(QGraphicsView):
                  polygons= ['/move_base/local_costmap/robot_footprint']):
         super(QWidget, self).__init__()
 
-        self.sig_map.connect(self._update)
+        self.map_changed.connect(self._update)
         self.destroyed.connect(self.close)
 
         self._map = None
@@ -111,21 +111,21 @@ class NavView(QGraphicsView):
         im.putdata(data)
         self._map = im
 
-        self.sig_map.emit()
+        self.map_changed.emit()
 
     def zoom_in(self, amount):
         self.w = self.w * amount
         self.h = self.h * amount
         self._map = self._map.resize((self.w, self.h))
         self.resolution = self.resolution / amount
-        self.sig_map.emit()
+        self.map_changed.emit()
 
     def zoom_out(self, amount):
         self.w = self.w / amount
         self.h = self.h / amount
         self._map = self._map.resize((self.w, self.h))
         self.resolution = self.resolution * amount
-        self.sig_map.emit()
+        self.map_changed.emit()
 
     def add_path(self, name):
         path = PathInfo(name)
