@@ -64,6 +64,9 @@ class NavView(QGraphicsView):
 
         self.map_changed.connect(self._update)
         self.destroyed.connect(self.close)
+        
+        #ScrollHandDrag
+        self.setDragMode(1)
 
         self._map = None
         self._map_item = None
