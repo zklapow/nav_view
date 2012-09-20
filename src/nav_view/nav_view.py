@@ -94,6 +94,14 @@ class NavView(QGraphicsView):
 
         self.setScene(self._scene)
 
+    def wheelEvent(self, event):
+        event.ignore()
+        
+        if event.delta() > 0:
+            self.zoom_in(2)
+        else:
+            self.zoom_out(2)
+
     def map_cb(self, msg):
         self.resolution = msg.info.resolution
         self.w = msg.info.width
