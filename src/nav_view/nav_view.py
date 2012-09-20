@@ -33,25 +33,7 @@ class NavViewWidget(QWidget):
         self._nav_view = NavView(map_topic, paths, polygons)
         self._layout.addWidget(self._nav_view)
 
-        self._button_layout = QHBoxLayout()
-
-        self._zoom_out_button = QPushButton('Zoom Out')
-        self._zoom_out_button.clicked.connect(self._zoom_out)
-        self._button_layout.addWidget(self._zoom_out_button)
-
-        self._zoom_in_button = QPushButton('Zoom In')
-        self._zoom_in_button.clicked.connect(self._zoom_in)
-        self._button_layout.addWidget(self._zoom_in_button)
-
-        self._layout.addLayout(self._button_layout)
-
         self.setLayout(self._layout)
-
-    def _zoom_in(self): 
-        self._nav_view.zoom_in(2)
-
-    def _zoom_out(self):
-        self._nav_view.zoom_out(2)
 
 class NavView(QGraphicsView):
     map_changed = pyqtSignal()
