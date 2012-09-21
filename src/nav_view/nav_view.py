@@ -51,6 +51,7 @@ class NavView(QGraphicsView):
         self.setDragMode(1)
 
         self._map = None
+        self._map_orig = None
         self._map_item = None
 
         self.w = 0
@@ -103,20 +104,21 @@ class NavView(QGraphicsView):
         im = Image.new('RGB', (self.w, self.h))
         im.putdata(data)
         self._map = im
+        self._map_orig = self._map
 
         self.map_changed.emit()
 
     def zoom_in(self, amount):
         self.w = self.w * amount
         self.h = self.h * amount
-        self._map = self._map.resize((self.w, self.h))
+        self._map = self._map_orig.resize((self.w, self.h))
         self.resolution = self.resolution / amount
         self.map_changed.emit()
 
     def zoom_out(self, amount):
         self.w = self.w / amount
         self.h = self.h / amount
-        self._map = self._map.resize((self.w, self.h))
+        self._map = self._map_orig.resize((self.w, self.h))
         self.resolution = self.resolution * amount
         self.map_changed.emit()
 
