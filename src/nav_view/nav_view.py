@@ -30,6 +30,7 @@ class NavViewWidget(QWidget):
         super(NavViewWidget, self).__init__()
         self._layout = QVBoxLayout()
 
+        self.setWindowTitle('Navigation Viewer')
         self._nav_view = NavView(map_topic, paths, polygons)
         self._layout.addWidget(self._nav_view)
 
